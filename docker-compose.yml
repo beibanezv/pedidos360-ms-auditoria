@@ -1,0 +1,22 @@
+# Postgres propio de ms-auditoria (desarrollo local).
+# Uso: docker compose up -d  (levanta solo la base; el broker vive en ms-admin)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: p360-auditoria-db
+    environment:
+      POSTGRES_USER: pedidos360
+      POSTGRES_PASSWORD: pedidos360
+      POSTGRES_DB: pedidos360_auditoria
+    ports:
+      - "5435:5432"
+    volumes:
+      - auditoria_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pedidos360 -d pedidos360_auditoria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  auditoria_data:
