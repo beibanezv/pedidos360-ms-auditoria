@@ -10,6 +10,7 @@ import com.pedidos360.auditoria.auditoria.EventoAuditoriaRepository;
 import com.pedidos360.auditoria.messaging.AuditoriaConsumer;
 import com.rabbitmq.client.Channel;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,6 +18,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 
 @ExtendWith(MockitoExtension.class)
 class AuditoriaConsumerTest {
@@ -59,5 +62,30 @@ class AuditoriaConsumerTest {
     consumer.auditar(mensaje("{\"ordenId\":\"1\"}"), channel, TAG, "orden.registrada");
 
     verify(channel).basicNack(TAG, false, true);
+  }
+
+  // Regresión Fase 6 (AWS): ms-orders timbra __TypeId__ con SU clase
+  // (com.pedidos360.orders.messaging.OrdenRegistradaEvent), que no existe
+  // aquí. Sin el mapeo del bean, todo evento real caía a la DLQ con
+  // ClassNotFoundException aunque este consumer solo lee el Message crudo.
+  @Test
+  void eventoRealDelBroker_noRevientaPorTypeIdForaneo() {
+    UUID orden = UUID.randomUUID();
+    UUID prod = UUID.randomUUID();
+    MessageProperties props = new MessageProperties();
+    props.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+    props.setHeader(DefaultJackson2JavaTypeMapper.DEFAULT_CLASSID_FIELD_NAME,
+        "com.pedidos360.orders.messaging.OrdenRegistradaEvent");
+    Message msg = new Message(
+        ("{\"ordenId\":\"" + orden + "\",\"usuarioId\":\"u-1\",\"items\":"
+            + "[{\"productoId\":\"" + prod + "\",\"cantidad\":1}],\"codigoCupon\":null}")
+            .getBytes(StandardCharsets.UTF_8),
+        props);
+
+    Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
+    converter.setJavaTypeMapper(
+        com.pedidos360.auditoria.config.RabbitMQConfig.ordenRegistradaTypeMapper());
+
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(() -> converter.fromMessage(msg));
   }
 }

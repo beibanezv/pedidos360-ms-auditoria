@@ -5,11 +5,12 @@ import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
+import java.util.Map;
 /**
  * Topología RabbitMQ que usa ms-auditoria (rúbrica EP3/EP4 indicadores 1 y 2).
  *
@@ -68,8 +69,22 @@ public class RabbitMQConfig {
         DLX_EXCHANGE, AUDITORIA_QUEUE, null);
   }
 
+  // Este consumer recibe Message crudo, pero el converter igual resuelve el
+  // __TypeId__ que timbra ms-orders con SU clase (que aquí no existe): sin
+  // este mapeo, Class.forName del id foráneo mandaba todo evento real a la
+  // DLQ. Se mapea a Object (solo importa no reventar; el payload se lee crudo).
+  // Método separado para poder testearlo sin levantar contexto Spring.
+  public static DefaultJackson2JavaTypeMapper ordenRegistradaTypeMapper() {
+    DefaultJackson2JavaTypeMapper typeMapper = new DefaultJackson2JavaTypeMapper();
+    typeMapper.setIdClassMapping(Map.of(
+        "com.pedidos360.orders.messaging.OrdenRegistradaEvent", Object.class));
+    return typeMapper;
+  }
+
   @Bean
   MessageConverter jsonMessageConverter() {
-    return new Jackson2JsonMessageConverter();
+    Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
+    converter.setJavaTypeMapper(ordenRegistradaTypeMapper());
+    return converter;
   }
 }
