@@ -12,8 +12,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Lectura de la bitácora. Sin Spring Security a propósito: en AWS lo
- * protege el authorizer JWT del API Gateway (igual que los demás nuevos).
+ * Lectura de la bitácora. En AWS la protege el authorizer JWT del API Gateway y
+ * aquí Spring Security exige ROLE_Admin de Entra: una búsqueda global no puede
+ * quedar a la vista de un comprador autenticado.
  */
 @RestController
 @RequestMapping("/auditoria")
