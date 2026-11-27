@@ -6,10 +6,12 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.DefaultJackson2JavaTypeMapper;
+import org.springframework.amqp.support.converter.Jackson2JavaTypeMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 /**
  * Topología RabbitMQ que usa ms-auditoria (rúbrica EP3/EP4 indicadores 1 y 2).
@@ -74,17 +76,49 @@ public class RabbitMQConfig {
   // este mapeo, Class.forName del id foráneo mandaba todo evento real a la
   // DLQ. Se mapea a Object (solo importa no reventar; el payload se lee crudo).
   // Método separado para poder testearlo sin levantar contexto Spring.
+  public static DefaultJackson2JavaTypeMapper jsonTypeMapper() {
+    Map<String, Class<?>> ids = new LinkedHashMap<>();
+
+    // Alias FQCN historicos de todos los productores -> Object (cuerpo crudo).
+    ids.put("com.pedidos360.carrito.messaging.OrdenCreadaEvent", Object.class);
+    ids.put("com.pedidos360.orders.messaging.OrdenCreadaEvent", Object.class);
+    ids.put("com.pedidos360.orders.messaging.OrdenRegistradaEvent", Object.class);
+    ids.put("com.pedidos360.productos.messaging.OrdenRegistradaEvent", Object.class);
+    ids.put("com.pedidos360.notificaciones.messaging.OrdenRegistradaEvent", Object.class);
+    ids.put("cl.pedidos360.cupones.messaging.OrdenRegistradaEvent", Object.class);
+    ids.put("com.pedidos360.productos.messaging.StockReservadoEvent", Object.class);
+    ids.put("com.pedidos360.orders.messaging.StockReservadoEvent", Object.class);
+    ids.put("com.pedidos360.productos.messaging.StockRechazadoEvent", Object.class);
+    ids.put("com.pedidos360.orders.messaging.StockRechazadoEvent", Object.class);
+    ids.put("com.pedidos360.productos.messaging.StockLiberadoEvent", Object.class);
+    ids.put("com.pedidos360.orders.messaging.StockLiberadoEvent", Object.class);
+    ids.put("com.pedidos360.pagos.PagoResueltoEvent", Object.class);
+    ids.put("com.pedidos360.pagos.messaging.PagoResueltoEvent", Object.class);
+    ids.put("com.pedidos360.orders.messaging.PagoResueltoEvent", Object.class);
+
+    // Nombres simples al final: son los que el productor escribe en __TypeId__.
+    ids.put("OrdenCreadaEvent", Object.class);
+    ids.put("OrdenRegistradaEvent", Object.class);
+    ids.put("StockReservadoEvent", Object.class);
+    ids.put("StockRechazadoEvent", Object.class);
+    ids.put("StockLiberadoEvent", Object.class);
+    ids.put("PagoResueltoEvent", Object.class);
+
+    DefaultJackson2JavaTypeMapper mapper = new DefaultJackson2JavaTypeMapper();
+    mapper.setIdClassMapping(ids);
+    mapper.setTypePrecedence(Jackson2JavaTypeMapper.TypePrecedence.TYPE_ID);
+    return mapper;
+  }
+
+  /** Nombre anterior conservado por compatibilidad con tests existentes. */
   public static DefaultJackson2JavaTypeMapper ordenRegistradaTypeMapper() {
-    DefaultJackson2JavaTypeMapper typeMapper = new DefaultJackson2JavaTypeMapper();
-    typeMapper.setIdClassMapping(Map.of(
-        "com.pedidos360.orders.messaging.OrdenRegistradaEvent", Object.class));
-    return typeMapper;
+    return jsonTypeMapper();
   }
 
   @Bean
   MessageConverter jsonMessageConverter() {
     Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
-    converter.setJavaTypeMapper(ordenRegistradaTypeMapper());
+    converter.setJavaTypeMapper(jsonTypeMapper());
     return converter;
   }
 }
