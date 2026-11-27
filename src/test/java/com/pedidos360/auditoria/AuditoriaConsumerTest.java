@@ -23,6 +23,7 @@ import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 
 @ExtendWith(MockitoExtension.class)
 class AuditoriaConsumerTest {
+  static { System.setProperty("p360.retry.espera-ms", "0"); }
 
   @Mock
   EventoAuditoriaRepository repository;
@@ -61,7 +62,7 @@ class AuditoriaConsumerTest {
 
     consumer.auditar(mensaje("{\"ordenId\":\"1\"}"), channel, TAG, "orden.registrada");
 
-    verify(channel).basicNack(TAG, false, true);
+    verify(channel).basicNack(TAG, false, false);
   }
 
   // Regresión Fase 6 (AWS): ms-orders timbra __TypeId__ con SU clase
